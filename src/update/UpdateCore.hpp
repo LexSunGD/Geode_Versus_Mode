@@ -328,8 +328,11 @@ public:
                         if (response.code == 404 || response.code == 410)
                             throw PackageError("Download interrupted; retry to resume");
                         require(response.code == 206, "Download interrupted; retry to resume");
-                        require(response.contentRange == "bytes " + std::to_string(offset) + "-" + std::to_string(end) +
-                                                             "/" + std::to_string(m.size),
+                        // Content-Range를 읽을 수 있으면 요청과 정확히 같아야 한다. 읽지 못해도 길이는 아래에서
+                        // 확인하고, 다 받은 파일은 SHA-256으로 검증한다.
+                        require(response.contentRange.empty() ||
+                                    response.contentRange == "bytes " + std::to_string(offset) + "-" +
+                                                                 std::to_string(end) + "/" + std::to_string(m.size),
                                 "Invalid Content-Range");
                         require(response.data.size() == end - offset + 1, "Incomplete download chunk; retry to resume");
                     }

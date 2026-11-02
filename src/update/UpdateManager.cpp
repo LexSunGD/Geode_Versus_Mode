@@ -296,10 +296,16 @@ fs::path UpdateManager::fetchPackage(Manifest const& manifest) {
                     return req.getSync(manifest.url);
                 },
                 &m_cancel);
-            auto range = response.header("Content-Range");
             DownloadResponse result;
             result.code = response.code();
-            if (range) result.contentRange = std::string(*range);
+            // 헤더 이름은 대소문자를 구분하지 않는다(HTTP/2는 소문자로 온다). 리다이렉트를 따라가면
+            // 응답 헤더가 여러 단계 쌓이므로 마지막(실제 파일 서버) 값을 쓴다.
+            for (char const* name : {"Content-Range", "content-range", "CONTENT-RANGE"}) {
+                if (auto all = response.getAllHeadersNamed(name); all && !all->empty()) {
+                    result.contentRange = all->back();
+                    break;
+                }
+            }
             result.data = std::move(response).data();
             return result;
         },
