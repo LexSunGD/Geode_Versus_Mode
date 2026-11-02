@@ -43,7 +43,6 @@ class UpdateManager {
     UpdateSnapshot m_snapshot;
     std::atomic_bool m_cancel{false};
     InstallContext m_context;
-    std::string m_token;
     bool m_installAfterRecords = false;
     bool m_creator = false;
     std::chrono::steady_clock::time_point m_recordsSince;
@@ -55,7 +54,7 @@ class UpdateManager {
     void state(UpdateState value, std::string message = {});
     void fail(std::string message);
     void authorize();
-    void performCheck(std::string token);
+    void performCheck();
     void validateArchive(fs::path const&, Manifest const&);
     std::optional<PatchPlan> loadPatch(Manifest const&);
     fs::path fetchPackage(Manifest const&);

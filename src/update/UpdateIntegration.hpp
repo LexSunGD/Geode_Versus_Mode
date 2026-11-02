@@ -3,8 +3,6 @@
 #include <functional>
 #include <string>
 namespace versus::update {
-// 업데이트 다운로드용 인증 정보를 서버에서 받는다.
-void authorizeUpdate(std::function<void(std::string, std::string)> callback);
 // Versus 화면(방/랭크/홈)으로 이동한다.
 void enterVersus();
 // 대전이 진행 중인지.

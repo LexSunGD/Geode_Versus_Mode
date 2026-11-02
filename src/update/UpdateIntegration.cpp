@@ -9,9 +9,6 @@ bool matchInProgress() {
 bool recordsPending() {
     return Service::get().recordsPending();
 }
-void authorizeUpdate(std::function<void(std::string, std::string)> callback) {
-    Service::get().authorizeUpdates(std::move(callback));
-}
 void checkStaffAccount(std::function<void(bool)> done) {
     Service::get().checkStaffMember(std::move(done));
 }

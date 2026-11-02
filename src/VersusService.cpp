@@ -2426,11 +2426,6 @@ bool Service::safeToUpdate() const {
     if (recordsPending()) return false;
     return !(s.room && s.room->started);
 }
-void Service::authorizeUpdates(std::function<void(std::string, std::string)> callback) {
-    connect([callback = std::move(callback)](bool ok, std::string error) {
-        callback(ok ? state().token : std::string{}, std::move(error));
-    });
-}
 PlayerProfile const& Service::profile() const {
     return state().profile;
 }

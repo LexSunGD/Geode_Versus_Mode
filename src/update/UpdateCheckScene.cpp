@@ -6,9 +6,6 @@
 #include "../KeyDefer.hpp"
 #include "../SystemText.hpp"
 #include "UpdateIntegration.hpp"
-#if VERSUS_BOOTSTRAP
-#include "../Edition.hpp"
-#endif
 #include <Geode/Geode.hpp>
 #include <Geode/binding/CreatorLayer.hpp>
 #include <Geode/binding/ButtonSprite.hpp>
@@ -99,7 +96,6 @@ class UpdateCheckScene final : public CCLayer {
             enterVersus();
             return;
         }
-#if !VERSUS_BOOTSTRAP
         // 서버 버전보다 설치된 버전이 높아 오류가 난 경우, 운영진 계정이면 한 번 다시 확인한다.
         if (s.state == UpdateState::Error && s.newerThanServer && !s.busy && !m_staffAsked) {
             m_staffAsked = true;
@@ -107,7 +103,6 @@ class UpdateCheckScene final : public CCLayer {
                 if (manager && !self->m_leaving && self->getParent()) UpdateManager::get().check();
             });
         }
-#endif
         if (s.message != m_lastMessage) {
             m_lastMessage = s.message;
             versus::setSystemText(m_status, s.message);
@@ -137,23 +132,14 @@ class UpdateCheckScene final : public CCLayer {
     }
 
 public:
-    // UI 구성. 제목(bootstrap 빌드는 설치기 제목), 버전 문구, 상태 문구, 진행 막대,
+    // UI 구성. 제목, 버전 문구, 상태 문구, 진행 막대,
     // 상태별 버튼을 만들고 업데이트 확인을 시작한다.
     bool init() override {
         if (!CCLayer::init()) return false;
         setKeypadEnabled(true);
         auto size = CCDirector::sharedDirector()->getWinSize();
         addChild(CCLayerColor::create(ccc4(15, 21, 33, 255), size.width, size.height));
-#if VERSUS_BOOTSTRAP
-        auto* title = CCLabelBMFont::create("VERSUS INSTALLER", "bigFont.fnt");
-        auto* edition = CCLabelBMFont::create("FIRST INSTALL", "bigFont.fnt");
-        edition->setScale(.36f);
-        edition->setPosition({size.width / 2, size.height - 69});
-        edition->setColor(ccc3(126, 206, 255));
-        addChild(edition);
-#else
         auto* title = CCLabelBMFont::create("VERSUS UPDATE", "bigFont.fnt");
-#endif
         title->setScale(.8f);
         title->setPosition({size.width / 2, size.height - 42});
         addChild(title);

@@ -13,7 +13,6 @@ and put it in Geometry Dash's Geode mods folder (`geode/mods`). One file works o
 | Path | Contents |
 |---|---|
 | `src/` | The mod that runs in the game (C++, Geode SDK) |
-| `bootstrap/` | Minimal first-install package |
 
 - Code comments are written in Korean.
 - Image and sound assets are not included in this repository. Get the complete mod from the releases.

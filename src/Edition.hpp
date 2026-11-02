@@ -17,13 +17,9 @@ namespace versus {
 constexpr bool isMembershipEdition() {
     return false;
 }
-// 빌드 종류를 구분하는 마커 문자열. bootstrap(설치기) 빌드와 통합 빌드가 서로 다르다.
+// 빌드 종류를 나타내는 마커 문자열 (로그에 남긴다).
 constexpr char const* editionMarker() {
-#if defined(VERSUS_BOOTSTRAP) && VERSUS_BOOTSTRAP
-    return "versus-edition:installer";
-#else
     return "versus-edition:unified";
-#endif
 }
 // 기본 그라데이션에서 position(0~1) 위치의 닉네임 색.
 constexpr std::array<unsigned char, 3> nicknameColor(float position) {

@@ -4,6 +4,7 @@
 
 ### Updates
 - Versus now downloads its updates from its GitHub releases (github.com/Rlaxogus123/Geode_Versus_Mode). Each release is built by GitHub from the published source code; the game checks the file's size and SHA-256 before installing it.
+- Checking for an update no longer needs the Versus server or a sign-in.
 
 ### Season 2
 - Plaza: the History button is now Profile (GD's profile icon) and opens your profile; your match history is in it.

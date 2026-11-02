@@ -856,7 +856,6 @@ public:
     static Service& get();
     void initialize();
     void connect(Done callback);
-    void authorizeUpdates(std::function<void(std::string, std::string)> callback);
     void fetchRelease(std::function<void(std::string, std::string)> callback);
     void fetchPatchNotes(std::function<void(std::string, std::string, std::string)> callback);
     void refreshMembership(Done callback);

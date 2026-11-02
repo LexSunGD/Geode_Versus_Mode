@@ -124,68 +124,56 @@ void UpdateManager::check() {
             std::lock_guard lock(m_mutex);
             m_snapshot.installedVersion = mod->getVersion().toNonVString();
             m_snapshot.installedChannel = isMembershipEdition() ? "member" : "public";
-// bootstrap(설치기) 빌드는 채널을 "bootstrap"으로 표시한다.
-#if VERSUS_BOOTSTRAP
-            m_snapshot.installedChannel = "bootstrap";
-#endif
         }
         authorize();
     } catch (std::exception const& error) {
         fail(error.what());
     }
 }
-// 서버 인증을 받은 뒤 백그라운드 스레드에서 performCheck를 실행한다.
+// 백그라운드 스레드에서 performCheck를 실행한다 (GitHub 릴리스 확인에는 로그인이 필요 없다).
 void UpdateManager::authorize() {
-    authorizeUpdate([this](std::string token, std::string error) {
-        if (m_cancel) {
-            fail("Update check canceled");
-            return;
-        }
-        if (!error.empty()) {
-            fail(std::move(error));
-            return;
-        }
-        try {
-            std::thread([this, token = std::move(token)]() mutable {
-                try {
-                    performCheck(std::move(token));
-                } catch (std::exception const& error) {
-                    fail(error.what());
-                }
-            }).detach();
-        } catch (std::exception const& error) {
-            fail(error.what());
-        }
-    });
+    if (m_cancel) {
+        fail("Update check canceled");
+        return;
+    }
+    try {
+        std::thread([this] {
+            try {
+                performCheck();
+            } catch (std::exception const& error) {
+                fail(error.what());
+            }
+        }).detach();
+    } catch (std::exception const& error) {
+        fail(error.what());
+    }
 }
 // 매니페스트를 받아 설치된 버전과 비교해 상태를 정한다.
 // 서버 버전이 더 낮으면 오류(제작자 계정의 디버그 빌드는 예외).
 // 같은 릴리스면 Current, 아니면 UpdateAvailable.
-void UpdateManager::performCheck(std::string token) {
+void UpdateManager::performCheck() {
     auto manifest = fetchManifest();
     require(!m_cancel, "Update check canceled");
     auto old = snapshot();
     auto latest = VersionInfo::parse(manifest.version), current = VersionInfo::parse(old.installedVersion);
     require(latest.isOk() && current.isOk(), "Invalid release version");
-    bool const bootstrap = old.installedChannel == "bootstrap";
-    bool const debugBuild = !bootstrap && m_creator && latest.unwrap() < current.unwrap();
+    bool const debugBuild = m_creator && latest.unwrap() < current.unwrap();
     {
         std::lock_guard lock(m_mutex);
-        m_snapshot.newerThanServer = !bootstrap && latest.unwrap() < current.unwrap();
+        m_snapshot.newerThanServer = latest.unwrap() < current.unwrap();
     }
-    require(bootstrap || debugBuild || current.unwrap() <= latest.unwrap(),
+    require(debugBuild || current.unwrap() <= latest.unwrap(),
             "Server release is older than this installation. Please retry later.");
     std::lock_guard lock(m_mutex);
     // 플랫폼 패키지가 쓸 수 없다고 판명된 버전은 통합 패키지로 바꾼다.
     if (!manifest.platform.empty() && manifest.version == m_unifiedOnly) manifest = manifest.unified();
-    m_token = std::move(token);
     m_snapshot.manifest = std::move(manifest);
     m_snapshot.downloaded = 0;
     m_snapshot.bytesPerSecond = 0;
     m_snapshot.busy = false;
     m_snapshot.transferTotal = 0;
     m_snapshot.transferDone = 0;
-    bool same = debugBuild || (!bootstrap && sameRelease(old.installedVersion, m_snapshot.manifest.version));
+    bool same = debugBuild || sameRelease(old.installedVersion, m_snapshot.manifest.version);
     m_snapshot.state = same ? UpdateState::Current : UpdateState::UpdateAvailable;
     m_snapshot.message = debugBuild ? "Debug build (newer than the server)"
                          : same     ? "Up to date"

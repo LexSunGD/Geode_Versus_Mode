@@ -13,9 +13,6 @@ using namespace geode::prelude;
 $on_mod(Loaded) {
     log::info("{}", versus::editionMarker());
     versus::update::confirmUpdateBoot();
-#if VERSUS_BOOTSTRAP
-    log::info("versus-bootstrap:1");
-#endif
 }
 
 // 메인 메뉴가 뜨면 업데이트 부팅 확인을 한 번 더 한다(모드 로드 시점에 놓친 경우 대비).

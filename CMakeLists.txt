@@ -8,8 +8,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 project(Versus VERSION 1.0.5 LANGUAGES C CXX)
-# VERSUS_BOOTSTRAP: 첫 설치용 다운로더만 빌드 (대전 코드·에셋 없음)
-option(VERSUS_BOOTSTRAP "Build only the first-install downloader (no battle code/assets)" OFF)
 
 # Windows 로컬 빌드는 성공하면 현재 Geode 프로필에 바로 설치한다.
 if(WIN32)
@@ -27,22 +25,17 @@ endif()
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
 )
-if(NOT VERSUS_BOOTSTRAP)
-    add_library(${PROJECT_NAME} SHARED ${SOURCES})
+add_library(${PROJECT_NAME} SHARED ${SOURCES})
+if(APPLE)
+    # SystemText.cpp가 CoreText로 시스템 글꼴 텍스트를 그린다.
+    target_link_libraries(${PROJECT_NAME} "-framework CoreText" "-framework CoreGraphics"
+        "-framework CoreFoundation")
 endif()
-if(NOT VERSUS_BOOTSTRAP)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE VERSUS_BOOTSTRAP=0)
-    if(APPLE)
-        # SystemText.cpp가 CoreText로 시스템 글꼴 텍스트를 그린다.
-        target_link_libraries(${PROJECT_NAME} "-framework CoreText" "-framework CoreGraphics"
-            "-framework CoreFoundation")
-    endif()
-    if(MSVC)
-        # /MP: 소스를 병렬로 컴파일. 크래시 로그의 RVA 해석용 .map 파일도 남긴다.
-        target_compile_options(${PROJECT_NAME} PRIVATE /Z7 /FS /MP)
-        target_link_options(${PROJECT_NAME} PRIVATE
-            "/MAP:${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/tipp7.versus.map")
-    endif()
+if(MSVC)
+    # /MP: 소스를 병렬로 컴파일. 크래시 로그의 RVA 해석용 .map 파일도 남긴다.
+    target_compile_options(${PROJECT_NAME} PRIVATE /Z7 /FS /MP)
+    target_link_options(${PROJECT_NAME} PRIVATE
+        "/MAP:${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/tipp7.versus.map")
 endif()
 
 # GEODE_SDK 환경 변수로 SDK 위치를 찾는다.
@@ -61,27 +54,22 @@ endif()
 message(STATUS "Found Geode: ${GEODE_SDK_PATH}")
 
 add_subdirectory("${GEODE_SDK_PATH}" "${CMAKE_CURRENT_BINARY_DIR}/geode")
-# 부트스트랩 빌드는 bootstrap/의 최소 패키지만 만든다.
-if(VERSUS_BOOTSTRAP)
-    add_subdirectory(bootstrap)
+setup_geode_mod(${PROJECT_NAME})
+# Argon(GD 계정 인증 라이브러리, MIT, github.com/GlobedGD/argon) 연동.
+# -DVERSUS_ARGON=OFF 로 끄고 빌드할 수 있다.
+option(VERSUS_ARGON "Link Argon for the account verification test" ON)
+if(VERSUS_ARGON)
+    # 오프라인으로 구성된 빌드 폴더에서도 Argon만은 한 번 내려받도록 허용한다.
+    set(FETCHCONTENT_FULLY_DISCONNECTED OFF)
+    CPMAddPackage("gh:GlobedGD/argon@1.5.1")
+    unset(FETCHCONTENT_FULLY_DISCONNECTED)
+endif()
+if(VERSUS_ARGON AND TARGET argon)
+    target_link_libraries(${PROJECT_NAME} argon)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE VERSUS_ARGON=1)
 else()
-    setup_geode_mod(${PROJECT_NAME})
-    # Argon(GD 계정 인증 라이브러리, MIT, github.com/GlobedGD/argon) 연동.
-    # -DVERSUS_ARGON=OFF 로 끄고 빌드할 수 있다.
-    option(VERSUS_ARGON "Link Argon for the account verification test" ON)
     if(VERSUS_ARGON)
-        # 오프라인으로 구성된 빌드 폴더에서도 Argon만은 한 번 내려받도록 허용한다.
-        set(FETCHCONTENT_FULLY_DISCONNECTED OFF)
-        CPMAddPackage("gh:GlobedGD/argon@1.5.1")
-        unset(FETCHCONTENT_FULLY_DISCONNECTED)
+        message(WARNING "Argon could not be fetched: building without the Argon test button")
     endif()
-    if(VERSUS_ARGON AND TARGET argon)
-        target_link_libraries(${PROJECT_NAME} argon)
-        target_compile_definitions(${PROJECT_NAME} PRIVATE VERSUS_ARGON=1)
-    else()
-        if(VERSUS_ARGON)
-            message(WARNING "Argon could not be fetched: building without the Argon test button")
-        endif()
-        target_compile_definitions(${PROJECT_NAME} PRIVATE VERSUS_ARGON=0)
-    endif()
+    target_compile_definitions(${PROJECT_NAME} PRIVATE VERSUS_ARGON=0)
 endif()
