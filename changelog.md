@@ -8,7 +8,8 @@
 
 ### Season 2
 - Plaza: the History button is now Profile (GD's profile icon) and opens your profile; your match history is in it.
-- The match panel has a Profile button at its bottom left, with your LDM box right of it.
+- The match panel has a Profile button (labeled Profile) at its bottom left, with your LDM box right of it.
+- Plaza: the notice (bell) button is hidden from when a match is found until the game starts.
 
 ### Fixes
 - The result screen after a Ranked match could stop responding (CONFIRM / PLAY AGAIN stayed on SAVING... and Back did nothing) when the server's answer to saving the result was lost. The game now retries, sees when the server already saved it, and a second Back always leaves.

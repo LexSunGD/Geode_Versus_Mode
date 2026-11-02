@@ -10092,6 +10092,20 @@ class RankedLayer final : public SceneLayer {
         }
         m_population->setVisible(board);
         if (!shown) m_searchBoard->setVisible(false);
+        season2Bell(mode == kS2Board || mode == kS2Result);
+    }
+    // 매치가 잡힌 뒤 게임이 시작될 때까지(매치/밴/연출 화면) 알림 버튼을 숨기고,
+    // 열려 있던 알림 창도 닫는다.
+    void season2Bell(bool shown) {
+        if (auto* bell = typeinfo_cast<CCMenuItem*>(getChildByIDRecursive("versus-broadcast-inbox"_spr))) {
+            bell->setVisible(shown);
+            bell->setEnabled(shown);
+        }
+        if (shown) return;
+        if (auto* scene = CCDirector::sharedDirector()->getRunningScene())
+            if (auto* popup = typeinfo_cast<::versus::DeferredPopup*>(
+                    scene->getChildByIDRecursive("versus-broadcast-inbox-popup"_spr)))
+                popup->closeFromCode();
     }
     // Season 2 맵 밴: banning 상태이고 후보가 3장 이상일 때 밴 보드를 만들고, 상태가
     // 바뀌면 갱신/정리한다.
@@ -10435,6 +10449,7 @@ class RankedLayer final : public SceneLayer {
         iconButton(actions, this, menu_selector(RankedLayer::onSeason2Profile), "GJ_profileButton_001.png",
                    {14.f, rowY}, 22.f)
             ->setID("season2-match-profile-button"_spr);
+        label(m_preview, "Profile", {14.f, rowY - 15.f}, .2f, 30.f, ccWHITE, false, "bigFont.fnt");
         m_ldmToggle = CCMenuItemToggler::createWithStandardSprites(this, menu_selector(RankedLayer::onLdm), .45f);
         m_ldmToggle->setID("ranked-ldm-toggle"_spr);
         m_ldmToggle->setPosition({42.f, rowY});
