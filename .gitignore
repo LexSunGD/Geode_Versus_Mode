@@ -1,0 +1,25 @@
+# 빌드 결과물
+build/
+build-*/
+build-tools/
+geode-deps/
+*.geode
+
+# Firebase 에뮬레이터 로그·내보내기
+firebase-debug.log
+database-debug.log
+firebase-export-*/
+
+# IDE·컴파일러 캐시
+.cache/
+.vs/
+.vscode/
+.idea/
+CMakeUserPresets.json
+*.obj
+*.pch
+*.pdb
+*.dll
+*.lib
+*.exp
+
