@@ -7498,6 +7498,7 @@ class RankedLayer final : public SceneLayer {
     bool m_ackPending = false;
     bool m_leaveAfterAck = false;
     float m_ackRetry = 0.f;
+    float m_transitionStuck = 0.f;
     float m_integrityTimer = 0.f;
     float m_pollTimer = 0.f;
     float m_readyTimer = 0.f;
@@ -7753,13 +7754,19 @@ class RankedLayer final : public SceneLayer {
         m_ackPending = true;
         Service::get().acknowledgeRanked(id, [self = Weak<RankedLayer>(this), id](bool ok, std::string detail) {
             auto owner = self.lock();
-            if (!owner || owner->m_observedMatch != id) return;
+            if (!owner) return;
+            // 응답이 늦게 와서 그 사이 다른 매치를 보고 있어도 '보내는 중' 표시는 풀어야 한다
+            // (안 풀면 확인을 다시 보내지 못해 결과 화면이 멈춘다).
             owner->m_ackPending = false;
+            if (owner->m_observedMatch != id) return;
             owner->m_resultAcknowledged = ok;
             owner->m_ackRetry = ok ? 0.f : 2.f;
-            if (!ok)
+            if (!ok) {
                 owner->m_status->setString(detail.c_str());
-            else if (owner->m_leaveAfterAck)
+                // Season 2 결과 화면에서는 상태 줄이 숨겨져 있으므로 알림으로도 보여 준다.
+                if (owner->m_season2 && !detail.empty())
+                    Notification::create(detail, NotificationIcon::Warning, 2.f)->show();
+            } else if (owner->m_leaveAfterAck)
                 owner->transitionHome();
             else {
                 owner->m_pollTimer = ranked::STATE_POLL_NOW;
@@ -8428,6 +8435,13 @@ class RankedLayer final : public SceneLayer {
             return;
         bool const firstState = !m_state.has_value();
         auto const incomingMatch = next.match ? next.match->id : std::string{};
+        // 확인을 못 받은 결과가 있는데 서버 상태에 그 매치가 더는 없으면, 서버는 이미 확인을
+        // 받은 것이다(응답만 잃어버린 경우). 결과 화면의 버튼이 영영 잠기지 않게 확인된 것으로 둔다.
+        if (m_lastResult && !m_resultAcknowledged && incomingMatch.empty()) {
+            m_resultAcknowledged = true;
+            m_ackPending = false;
+            m_ackRetry = 0.f;
+        }
         if (!incomingMatch.empty() && incomingMatch != m_observedMatch) {
             m_lastResult.reset();
             m_delta->stopAllActions();
@@ -9202,6 +9216,11 @@ class RankedLayer final : public SceneLayer {
             if (m_transitioning) return;
         }
         if (m_lastResult && !m_resultAcknowledged) {
+            // 두 번째 뒤로 가기는 확인을 기다리지 않고 나간다 (결과는 서버에 이미 저장되어 있다).
+            if (m_leaveAfterAck) {
+                transitionHome();
+                return;
+            }
             m_leaveAfterAck = true;
             acknowledge(m_lastResult->matchId);
             return;
@@ -9474,8 +9493,9 @@ class RankedLayer final : public SceneLayer {
         enabled(m_action, false);
         m_tools = menu(m_s2Rows);
         m_tools->setContentSize({0.f, 0.f});
-        iconButton(m_tools, this, menu_selector(RankedLayer::onHistory), "GJ_viewListsBtn_001.png", {0.f, 0.f},
-                   kToolSize);
+        iconButton(m_tools, this, menu_selector(RankedLayer::onSeason2Profile), "GJ_profileButton_001.png",
+                   {0.f, 0.f}, kToolSize)
+            ->setID("season2-profile-button"_spr);
         auto* music = iconButton(m_tools, this, menu_selector(RankedLayer::onSeason2Music), "GJ_audioOnBtn_001.png",
                                  {kToolPitch, 0.f}, kToolSize);
         music->setID("ranked-music-volume-button"_spr);
@@ -9488,7 +9508,7 @@ class RankedLayer final : public SceneLayer {
         m_tools->setPosition({toolsX, kS2SideY});
         m_s2ToolCaptions = CCNode::create();
         m_s2Rows->addChild(m_s2ToolCaptions, 4);
-        season2Caption(m_s2ToolCaptions, "History", toolsX);
+        season2Caption(m_s2ToolCaptions, "Profile", toolsX);
         season2Caption(m_s2ToolCaptions, "Music", toolsX + kToolPitch);
         season2Caption(m_s2ToolCaptions, "Game", toolsX + kToolPitch * 2.f);
         season2Caption(m_s2ToolCaptions, "Info", toolsX + kToolPitch * kS2ToolSpan);
@@ -10319,6 +10339,8 @@ class RankedLayer final : public SceneLayer {
         }
     }
     void onSeason2Opponent(CCObject* sender) { onOpponentInfo(sender); }
+    // 내 프로필 창을 연다 (광장 도구 줄과 매치 판넬의 Profile 버튼).
+    void onSeason2Profile(CCObject*) { showPlayer(Service::get().profile()); }
     // Season 2 매치 미리보기 레이아웃의 다운로드 영역 크기 상수.
     static constexpr float kS2DownloadW = 124.f, kS2DownloadY = 25.f, kS2DownloadPlateH = 15.f;
     // Season 2 매치 미리보기를 만든다: 양쪽 다운로드 상태, 맵 라이프/길이/2인 모드 표시,
@@ -10409,11 +10431,15 @@ class RankedLayer final : public SceneLayer {
         m_bandCard = nullptr;
         m_bandCardKey.clear();
         refreshBandCard(match);
+        // 왼쪽 아래: 내 프로필 버튼, 그 오른쪽에 LDM 체크박스.
+        iconButton(actions, this, menu_selector(RankedLayer::onSeason2Profile), "GJ_profileButton_001.png",
+                   {14.f, rowY}, 22.f)
+            ->setID("season2-match-profile-button"_spr);
         m_ldmToggle = CCMenuItemToggler::createWithStandardSprites(this, menu_selector(RankedLayer::onLdm), .45f);
         m_ldmToggle->setID("ranked-ldm-toggle"_spr);
-        m_ldmToggle->setPosition({14.f, rowY});
+        m_ldmToggle->setPosition({42.f, rowY});
         actions->addChild(m_ldmToggle);
-        label(m_preview, "LDM", {36.f, rowY}, .25f, 30.f, kIce);
+        label(m_preview, "LDM", {64.f, rowY}, .25f, 30.f, kIce);
         auto* card = CCSprite::create();
         card->setContentSize(cardSize);
         auto* back = NineSlice::create("square02b_001.png");
@@ -10754,6 +10780,21 @@ public:
         if (m_state && m_state->match &&
             (m_state->match->result || m_state->match->state == "canceled" || m_state->match->state == "rematch_wait"))
             acknowledge(m_state->match->id);
+        else if (m_lastResult && !m_resultAcknowledged && m_lastResult->matchId == m_observedMatch)
+            acknowledge(m_lastResult->matchId);  // 서버 상태에 매치가 없어도 결과 확인은 계속 다시 보낸다
+        // 화면 전환을 시작했는데 3초가 지나도 이 화면이 그대로 실행 중이면(전환이 일어나지 않음)
+        // 전환 중 표시를 풀어 버튼과 뒤로 가기가 다시 동작하게 한다.
+        if (m_transitioning) {
+            CCNode* root = this;
+            while (root->getParent()) root = root->getParent();
+            if (root == CCDirector::sharedDirector()->getRunningScene() && (m_transitionStuck += dt) >= 3.f) {
+                log::warn("Versus: a screen change did not happen; the Ranked screen takes input again");
+                m_transitioning = false;
+                m_transitionStuck = 0.f;
+                render();
+            }
+        } else
+            m_transitionStuck = 0.f;
         if (m_state) m_searchBoard->refresh(*m_state, dt, m_stateRevision);
         if (m_introTime > 0.f) {
             m_introTime = std::max(0.f, m_introTime - dt);

@@ -21,25 +21,14 @@
 using namespace geode::prelude;
 namespace versus::update {
 namespace {
-// 이 빌드의 플랫폼 패키지 이름. 알 수 없는 플랫폼이면 빈 문자열(통합 패키지 사용).
-constexpr char const* kPlatformPackage =
-#if defined(GEODE_IS_WINDOWS)
-    "windows";
-#elif defined(GEODE_IS_ANDROID)
-    "android";
-#elif defined(GEODE_IS_MACOS)
-    "macos";
-#elif defined(GEODE_IS_IOS)
-    "ios";
-#else
-    "";
-#endif
-// 공통 요청 설정: 20초 타임아웃, 인증서 검증, 리다이렉트 금지, 압축 없음, 캐시 방지.
+// 공통 요청 설정: 20초 타임아웃, 인증서 검증, 압축 없음, 캐시 방지.
+// GitHub 릴리스 파일은 GitHub의 다운로드 서버로 리다이렉트되므로 리다이렉트를 따라간다.
+// 받은 파일은 매니페스트의 크기와 SHA-256으로 검증한다.
 web::WebRequest request() {
     auto req = web::WebRequest();
     req.timeout(std::chrono::seconds(20));
     req.certVerification(true);
-    req.followRedirects(false);
+    req.followRedirects(true);
     req.acceptEncoding("identity");
     req.header("Cache-Control", "no-cache");
     return req;
@@ -69,18 +58,11 @@ std::string string(matjson::Value const& value, char const* key) {
     require(field.isOk() && field.unwrap().isString(), "Missing manifest field");
     return field.unwrap().asString().unwrap();
 }
-// 토큰으로 채널 결정과 매니페스트 주소를 받고, 허용된 주소인지 확인한 뒤 매니페스트를 받아
-// 검증한다.
-// modId, 채널, 스키마(1), 크기 범위, 정책 필드를 확인하고 플랫폼 패키지 정보를 반영한다.
-Manifest fetchManifest(std::string const& token) {
-    auto decision = json(withRetry([&] {
-        auto req = request();
-        req.header("Authorization", "Bearer " + token);
-        return req.getSync(std::string(ORIGIN) + "/updates/channel");
-    }));
-    auto channel = string(decision, "channel"), url = string(decision, "manifest");
-    require(allowedUrl(url, channel, "manifest.json"), "Untrusted manifest URL");
-    auto value = json(withRetry([&] { return request().getSync(url); }));
+// GitHub 최신 릴리스의 매니페스트를 받아 검증한다.
+// modId, 채널(public), 스키마(1), 크기 범위, 정책 필드, 패키지 주소를 확인한다.
+Manifest fetchManifest() {
+    auto value = json(withRetry([&] { return request().getSync(manifestUrl()); }));
+    std::string const channel = "public";
     require(string(value, "modId") == "tipp7.versus" && string(value, "channel") == channel,
             "Manifest identity mismatch");
     auto schema = value.get("schema"), size = value.get("size"), mandatory = value.get("mandatory");
@@ -93,7 +75,6 @@ Manifest fetchManifest(std::string const& token) {
                string(value, "sha256"),       channel,
                static_cast<uint64_t>(number), mandatory.unwrap().asBool().unwrap()};
     ManifestVerifier().validate(m);
-    adoptPlatform(m, value, kPlatformPackage);
     return m;
 }
 }
@@ -181,7 +162,7 @@ void UpdateManager::authorize() {
 // 서버 버전이 더 낮으면 오류(제작자 계정의 디버그 빌드는 예외).
 // 같은 릴리스면 Current, 아니면 UpdateAvailable.
 void UpdateManager::performCheck(std::string token) {
-    auto manifest = fetchManifest(token);
+    auto manifest = fetchManifest();
     require(!m_cancel, "Update check canceled");
     auto old = snapshot();
     auto latest = VersionInfo::parse(manifest.version), current = VersionInfo::parse(old.installedVersion);

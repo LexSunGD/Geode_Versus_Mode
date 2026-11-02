@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
-project(Versus VERSION 1.0.4 LANGUAGES C CXX)
+project(Versus VERSION 1.0.5 LANGUAGES C CXX)
 # VERSUS_BOOTSTRAP: 첫 설치용 다운로더만 빌드 (대전 코드·에셋 없음)
 option(VERSUS_BOOTSTRAP "Build only the first-install downloader (no battle code/assets)" OFF)
 

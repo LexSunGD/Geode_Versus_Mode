@@ -56,14 +56,9 @@ inline bool adoptPlatform(Manifest& m, matjson::Value const& manifest, std::stri
 
 // 패치 계획 JSON의 URL을 만든다. 파일명에 설치된 패키지 해시 앞 16자를 넣고,
 // 패키지 URL의 쿼리(ticket)를 그대로 붙이며, 허용된 주소일 때만 반환한다.
-inline std::string patchUrl(Manifest const& m, std::string const& baseDigest) {
-    if (m.platform.empty() || !platformValid(m.platform) || !digestValid(baseDigest)) return {};
-    auto suffix =
-        "releases/" + m.version + "/tipp7.versus." + m.platform + ".from-" + baseDigest.substr(0, 16) + ".json";
-    auto const query = m.url.find('?');
-    auto url = std::string(ORIGIN) + "/updates/" + m.channel + "/" + suffix +
-               (query == std::string::npos ? std::string() : m.url.substr(query));
-    return allowedUrl(url, m.channel, suffix) ? url : std::string();
+// GitHub 릴리스는 패치 계획을 제공하지 않으므로 항상 빈 문자열(전체 다운로드)이다.
+inline std::string patchUrl(Manifest const&, std::string const&) {
+    return {};
 }
 
 // 패치 계획 JSON을 PatchPlan으로 바꾼다. 스키마 1, 버전/플랫폼, 목표 패키지와 기존

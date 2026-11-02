@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.0.5 (2026-11-03)
+
+### Updates
+- Versus now downloads its updates from its GitHub releases (github.com/Rlaxogus123/Geode_Versus_Mode). Each release is built by GitHub from the published source code; the game checks the file's size and SHA-256 before installing it.
+
+### Season 2
+- Plaza: the History button is now Profile (GD's profile icon) and opens your profile; your match history is in it.
+- The match panel has a Profile button at its bottom left, with your LDM box right of it.
+
+### Fixes
+- The result screen after a Ranked match could stop responding (CONFIRM / PLAY AGAIN stayed on SAVING... and Back did nothing) when the server's answer to saving the result was lost. The game now retries, sees when the server already saved it, and a second Back always leaves.
+
 ## v1.0.4 (2026-11-02)
 
 ### Season 2

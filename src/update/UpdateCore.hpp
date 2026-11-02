@@ -13,8 +13,17 @@
 
 namespace versus::update {
 namespace fs = std::filesystem;
-// 업데이트 서버 주소. 다운로드 URL은 이 주소 아래 경로만 허용한다.
-inline constexpr char ORIGIN[] = "https://54.180.43.196";
+// 공개 저장소의 GitHub Release 주소. 매니페스트와 패키지는 여기서만 받는다.
+// 릴리스는 GitHub Actions가 공개된 소스 코드로 빌드해 올린다(.github/workflows/build.yml).
+inline constexpr char RELEASES[] = "https://github.com/Rlaxogus123/Geode_Versus_Mode/releases";
+// 최신 릴리스의 매니페스트 주소.
+inline std::string manifestUrl() {
+    return std::string(RELEASES) + "/latest/download/manifest.json";
+}
+// 버전 X.Y.Z 릴리스의 통합 패키지 주소.
+inline std::string packageUrl(std::string const& version) {
+    return std::string(RELEASES) + "/download/v" + version + "/tipp7.versus.geode";
+}
 // 패키지 최대 크기(128MB)와 한 번에 요청하는 조각 크기(1MB).
 inline constexpr uint64_t MAX_SIZE = 128 * 1024 * 1024, CHUNK_SIZE = 1024 * 1024;
 // Android에서 자동 설치를 시도할지 여부.
@@ -36,7 +45,7 @@ struct VerifyError : PackageError {
 struct PatchError : std::runtime_error {
     using std::runtime_error::runtime_error;
 };
-// 채널은 public 또는 member만 유효하다.
+// 채널은 public 또는 member만 유효하다(member는 예전 설치 기록을 읽을 때만 쓰인다).
 inline bool channelValid(std::string const& channel) {
     return channel == "public" || channel == "member";
 }
@@ -53,21 +62,9 @@ inline bool digestValid(std::string const& hash) {
     return hash.size() == 64 && std::all_of(hash.begin(), hash.end(),
                                             [](char c) { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'); });
 }
-// member 채널 URL에 붙는 "?ticket=" 쿼리가 허용 문자만으로 이루어졌는지 확인한다.
-inline bool ticketValid(std::string_view query) {
-    return query.starts_with("?ticket=") && query.size() > 8 && query.size() < 2100 &&
-           std::all_of(query.begin() + 8, query.end(), [](char c) {
-               return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' ||
-                      c == '-' || c == '.';
-           });
-}
-// URL이 ORIGIN/updates/<채널>/<suffix>와 일치하는지 확인한다. public은 완전히 같아야 하고,
-// member는 뒤에 유효한 ticket 쿼리만 붙을 수 있다.
-inline bool allowedUrl(std::string const& url, std::string const& channel, std::string const& suffix) {
-    if (!channelValid(channel)) return false;
-    auto expected = std::string(ORIGIN) + "/updates/" + channel + "/" + suffix;
-    if (channel == "public") return url == expected;
-    return url.starts_with(expected) && ticketValid(std::string_view(url).substr(expected.size()));
+// 패키지 URL은 public 채널의, 그 버전 GitHub 릴리스의 통합 패키지 주소와 정확히 같아야 한다.
+inline bool allowedUrl(std::string const& url, std::string const& channel, std::string const& version) {
+    return channel == "public" && url == packageUrl(version);
 }
 // 지원하는 플랫폼 이름인지.
 inline bool platformValid(std::string_view platform) {
@@ -110,13 +107,9 @@ public:
         require(versionValid(m.version), "Invalid semantic version");
         require(digestValid(m.sha256), "Invalid SHA-256 manifest");
         require(m.size >= 1024 && m.size <= MAX_SIZE, "Invalid download size");
-        require(m.platform.empty() || platformValid(m.platform), "Invalid platform package");
-        require(allowedUrl(m.url, m.channel, packageSuffix(m.version, m.platform)), "Untrusted download URL");
-        if (!m.platform.empty()) {
-            require(digestValid(m.unifiedSha256), "Invalid SHA-256 manifest");
-            require(m.unifiedSize >= 1024 && m.unifiedSize <= MAX_SIZE, "Invalid download size");
-            require(allowedUrl(m.unifiedUrl, m.channel, packageSuffix(m.version, {})), "Untrusted download URL");
-        }
+        // GitHub 릴리스는 통합 패키지 하나만 제공한다.
+        require(m.platform.empty(), "Invalid platform package");
+        require(allowedUrl(m.url, m.channel, m.version), "Untrusted download URL");
     }
 };
 // 패치 계획의 조각 하나. kind: 'c' = 설치된 패키지에서 복사(baseOffset부터),
